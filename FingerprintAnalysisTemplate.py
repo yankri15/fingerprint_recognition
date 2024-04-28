@@ -1,0 +1,128 @@
+from abc import ABC, abstractmethod
+import numpy as np
+import cv2
+from skimage.morphology import skeletonize as ski_skeletonize
+import os
+from scipy import ndimage
+from scipy.ndimage import rotate, grey_dilation
+from glob import glob
+from main_finger_print_algo import calculate_minutiae_weights, draw_ridges_count_on_region, get_best_region, skeletonize
+from utils.segmentation import create_segmented_and_variance_images
+from utils.normalization import normalize
+from utils.gabor_filter import gabor_filter
+from utils.frequency import ridge_freq
+from utils import orientation
+
+class FingerprintAnalysisTemplate(ABC):
+
+    def __init__(self, block_size=16):
+        self.block_size = block_size
+
+    def analyze_fingerprint(self, image):
+        normalized_img = self.normalize(image)
+        segmented_img, normim, mask = self.segment(normalized_img)
+        # should I save the orientation_img for later visualization?
+        angles, orientation_img = self.calculate_orientation(normim, segmented_img, mask)
+        freq = self.calculate_frequency(normim, mask, angles)
+        gabor_filtered_img = self.apply_gabor_filters(normim, angles, freq)
+        thin_image = self.skeletonize(gabor_filtered_img)
+        minutiae_weights_image = self.calculate_minutiae_weights(thin_image)
+        best_region = self.select_best_region(thin_image, minutiae_weights_image, mask)
+        result_image = self.draw_ridges_count_on_region(best_region, image, thin_image)
+        return result_image
+        
+    @abstractmethod
+    def normalize(self):
+        pass
+
+    @abstractmethod
+    def segment(self):
+        pass
+
+    @abstractmethod
+    def calculate_orientation(self):
+        pass
+
+    @abstractmethod
+    def calculate_frequency(self):
+        pass
+
+    @abstractmethod
+    def apply_gabor_filters(self):
+        pass
+
+    @abstractmethod
+    def skeletonize(self):
+        pass
+
+    @abstractmethod
+    def calculate_minutiae_weights(self):
+        pass
+
+    @abstractmethod
+    def select_best_region(self):
+        pass
+
+    @abstractmethod
+    def draw_ridges_count_on_region(self):
+        pass
+
+class ConcreteFingerprintAnalysis(FingerprintAnalysisTemplate):
+
+    def analyze_fingerprint(self, image):
+        return super().analyze_fingerprint(image)
+
+    def normalize(self, image):
+        return normalize(image.copy(), float(100), float(100))
+    
+    def segment(self, image):
+        return create_segmented_and_variance_images(image, self.block_size, 0.2)
+    
+    def calculate_orientation(self, image, segmented_img, mask):
+        angles = orientation.calculate_angles(image, W=self.block_size, smoth=False)
+        orientation_img = orientation.visualize_angles(segmented_img, mask, angles, W=self.block_size)
+
+        return angles, orientation_img
+        
+    def calculate_frequency(self, normim, mask, angles):
+        return ridge_freq(normim, mask, angles, self.block_size, kernel_size=5, minWaveLength=5, maxWaveLength=15)
+    
+    def apply_gabor_filters(self, normim, angles, freq):
+        return gabor_filter(normim, angles, freq)
+    
+    def skeletonize(self, image):
+        return skeletonize(image)
+    
+    def calculate_minutiae_weights(self, image):
+        return calculate_minutiae_weights(image)
+    
+    def select_best_region(self, thin_image, minutiae_weights_image, mask):
+        return get_best_region(thin_image, minutiae_weights_image, self.block_size, mask)
+    
+    def draw_ridges_count_on_region(self, best_region, image, thin_image):
+        return draw_ridges_count_on_region(best_region, image, thin_image, self.block_size)
+    
+
+
+
+if __name__ == '__main__':
+    input_path = './all_png_files/'
+    output_path = './all_png_files_out/'
+
+    if not os.path.exists(output_path):
+        os.makedirs(output_path)
+
+    analysis = ConcreteFingerprintAnalysis()
+
+    for img_name in os.listdir(input_path):
+        img_dir = os.path.join(input_path, img_name)
+        greyscale_image = cv2.imread(img_dir, 0)  
+
+        if greyscale_image is None:
+            continue
+
+        print(img_name)
+
+        output_image = analysis.analyze_fingerprint(greyscale_image)
+
+        cv2.imwrite(os.path.join(output_path, img_name), output_image)
