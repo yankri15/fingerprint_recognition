@@ -32,39 +32,39 @@ class FingerprintAnalysisTemplate(ABC):
         return [image, normalized_img, segmented_img, orientation_img, gabor_filtered_img, thin_image, minutiae_weights_image, result_image]
         
     @abstractmethod
-    def normalize(self):
+    def normalize(self, image):
         pass
 
     @abstractmethod
-    def segment(self):
+    def segment(self, normalized_img):
         pass
 
     @abstractmethod
-    def calculate_orientation(self):
+    def calculate_orientation(self, normim, segmented_img, mask):
         pass
 
     @abstractmethod
-    def calculate_frequency(self):
+    def calculate_frequency(self, normim, mask, angles):
         pass
 
     @abstractmethod
-    def apply_gabor_filters(self):
+    def apply_gabor_filters(self, normim, angles, freq):
         pass
 
     @abstractmethod
-    def skeletonize(self):
+    def skeletonize(self, gabor_filtered_img):
         pass
 
     @abstractmethod
-    def calculate_minutiae_weights(self):
+    def calculate_minutiae_weights(self, thin_image):
         pass
 
     @abstractmethod
-    def select_best_region(self):
+    def select_best_region(self, thin_image, minutiae_weights_image, mask):
         pass
 
     @abstractmethod
-    def draw_ridges_count_on_region(self):
+    def draw_ridges_count_on_region(self, best_region, image, thin_image):
         pass
 
 class ConcreteFingerprintAnalysis(FingerprintAnalysisTemplate):
@@ -102,8 +102,6 @@ class ConcreteFingerprintAnalysis(FingerprintAnalysisTemplate):
     def draw_ridges_count_on_region(self, best_region, image, thin_image):
         return draw_ridges_count_on_region(best_region, image, thin_image, self.block_size)
     
-
-
 def client_code(fingerprint_analysis: FingerprintAnalysisTemplate, image):
     return fingerprint_analysis.analyze_fingerprint(image)
 
@@ -123,18 +121,3 @@ if __name__ == '__main__':
     images = client_code(ConcreteFingerprintAnalysis(), image)
     for i, img in enumerate(images):
         cv2.imwrite(f'result_image_chain_{i}.png', img)
-
-    # analysis = ConcreteFingerprintAnalysis()
-
-    # for img_name in os.listdir(input_path):
-    #     img_dir = os.path.join(input_path, img_name)
-    #     greyscale_image = cv2.imread(img_dir, 0)  
-
-    #     if greyscale_image is None:
-    #         continue
-
-    #     print(img_name)
-
-    #     output_image = analysis.analyze_fingerprint(greyscale_image)
-
-    #     cv2.imwrite(os.path.join(output_path, img_name), output_image)
