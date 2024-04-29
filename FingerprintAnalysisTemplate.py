@@ -29,7 +29,7 @@ class FingerprintAnalysisTemplate(ABC):
         minutiae_weights_image = self.calculate_minutiae_weights(thin_image)
         best_region = self.select_best_region(thin_image, minutiae_weights_image, mask)
         result_image = self.draw_ridges_count_on_region(best_region, image, thin_image)
-        return result_image
+        return [image, normalized_img, segmented_img, orientation_img, gabor_filtered_img, thin_image, minutiae_weights_image, result_image]
         
     @abstractmethod
     def normalize(self):
@@ -104,6 +104,8 @@ class ConcreteFingerprintAnalysis(FingerprintAnalysisTemplate):
     
 
 
+def client_code(fingerprint_analysis: FingerprintAnalysisTemplate, image):
+    return fingerprint_analysis.analyze_fingerprint(image)
 
 if __name__ == '__main__':
     input_path = './all_png_files/'
@@ -112,17 +114,27 @@ if __name__ == '__main__':
     if not os.path.exists(output_path):
         os.makedirs(output_path)
 
-    analysis = ConcreteFingerprintAnalysis()
+    path = os.getcwd() + '/all_png_files'
+    img_name = "M89_f0115_03.png"
+    img_path = f'{path}/{img_name}'
+    image = cv2.imread(img_path, 0)
+    cv2.imshow(img_name, image)
 
-    for img_name in os.listdir(input_path):
-        img_dir = os.path.join(input_path, img_name)
-        greyscale_image = cv2.imread(img_dir, 0)  
+    images = client_code(ConcreteFingerprintAnalysis(), image)
+    for i, img in enumerate(images):
+        cv2.imwrite(f'result_image_chain_{i}.png', img)
 
-        if greyscale_image is None:
-            continue
+    # analysis = ConcreteFingerprintAnalysis()
 
-        print(img_name)
+    # for img_name in os.listdir(input_path):
+    #     img_dir = os.path.join(input_path, img_name)
+    #     greyscale_image = cv2.imread(img_dir, 0)  
 
-        output_image = analysis.analyze_fingerprint(greyscale_image)
+    #     if greyscale_image is None:
+    #         continue
 
-        cv2.imwrite(os.path.join(output_path, img_name), output_image)
+    #     print(img_name)
+
+    #     output_image = analysis.analyze_fingerprint(greyscale_image)
+
+    #     cv2.imwrite(os.path.join(output_path, img_name), output_image)
