@@ -3,9 +3,6 @@ import numpy as np
 import cv2
 from skimage.morphology import skeletonize as ski_skeletonize
 import os
-from scipy import ndimage
-from scipy.ndimage import rotate, grey_dilation
-from glob import glob
 from main_finger_print_algo import calculate_minutiae_weights, draw_ridges_count_on_region, get_best_region, skeletonize
 from utils.segmentation import create_segmented_and_variance_images
 from utils.normalization import normalize
@@ -29,7 +26,7 @@ class FingerprintAnalysisTemplate(ABC):
         minutiae_weights_image = self.calculate_minutiae_weights(thin_image)
         best_region = self.select_best_region(thin_image, minutiae_weights_image, mask)
         result_image = self.draw_ridges_count_on_region(best_region, image, thin_image)
-        return [image, normalized_img, segmented_img, orientation_img, gabor_filtered_img, thin_image, minutiae_weights_image, result_image]
+        return [image, normalized_img, segmented_img, orientation_img, gabor_filtered_img, thin_image, result_image]
         
     @abstractmethod
     def normalize(self, image):
@@ -75,8 +72,8 @@ class ConcreteFingerprintAnalysis(FingerprintAnalysisTemplate):
     def normalize(self, image):
         return normalize(image.copy(), float(100), float(100))
     
-    def segment(self, image):
-        return create_segmented_and_variance_images(image, self.block_size, 0.2)
+    def segment(self, normalized_img):
+        return create_segmented_and_variance_images(normalized_img, self.block_size, 0.2)
     
     def calculate_orientation(self, image, segmented_img, mask):
         angles = orientation.calculate_angles(image, W=self.block_size, smoth=False)
@@ -90,11 +87,11 @@ class ConcreteFingerprintAnalysis(FingerprintAnalysisTemplate):
     def apply_gabor_filters(self, normim, angles, freq):
         return gabor_filter(normim, angles, freq)
     
-    def skeletonize(self, image):
-        return skeletonize(image)
+    def skeletonize(self, gabor_filtered_img):
+        return skeletonize(gabor_filtered_img)
     
-    def calculate_minutiae_weights(self, image):
-        return calculate_minutiae_weights(image)
+    def calculate_minutiae_weights(self, thin_image):
+        return calculate_minutiae_weights(thin_image)
     
     def select_best_region(self, thin_image, minutiae_weights_image, mask):
         return get_best_region(thin_image, minutiae_weights_image, self.block_size, mask)
@@ -117,7 +114,10 @@ if __name__ == '__main__':
     img_path = f'{path}/{img_name}'
     image = cv2.imread(img_path, 0)
     cv2.imshow(img_name, image)
+    cv2.waitKey()
 
     images = client_code(ConcreteFingerprintAnalysis(), image)
-    for i, img in enumerate(images):
-        cv2.imwrite(f'result_image_chain_{i}.png', img)
+    lables = ['image', 'normalized_img', 'segmented_img', 'orientation_img', 'gabor_filtered_img', 'skeletonize_img', 'result_image']
+
+    for step, (img, name) in enumerate(zip(images, lables)):
+        cv2.imwrite(f'chain_{name}_step{step}.png', img)
